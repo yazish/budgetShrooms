@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcrypt";
-import { cookies } from "next/headers";
-import { createSessionToken } from "@/lib/session";
+import { createSession } from "@/lib/session";
 
 export async function POST(request: Request) {
   const { email, password } = await request.json();
@@ -17,8 +16,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const token = await createSessionToken(user.id);
-  cookies().set("session", token, { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
+  await createSession(user.id);
 
   return NextResponse.json({ id: user.id, email: user.email, name: user.name });
 }
