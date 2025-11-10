@@ -24,7 +24,7 @@ export default function AboutPage() {
 
           <div className="space-y-4">
             <h1 className="text-2xl font-semibold text-slate-900">About the Designer</h1>
-            <p className="text-base leading-relaxed text-slate-700">
+            <p className="text-left text-base leading-relaxed text-slate-700">
               Hi, I am Yazish Kavina, a 3rd year undergrad student at University of Manitoba pursuing Computer
               Science.
             </p>
