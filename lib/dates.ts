@@ -64,18 +64,20 @@ export function parseMonth(value: string) {
   return { year, month };
 }
 
+const monthTitleFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: DISPLAY_TIMEZONE,
+  year: "numeric",
+  month: "long",
+});
+
 export function formatMonthTitle(monthId: string) {
   const parsed = parseMonth(monthId);
   if (!parsed) {
     return monthId;
   }
   const { year, month } = parsed;
-  const date = new Date(Date.UTC(year, month - 1, 1));
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: DISPLAY_TIMEZONE,
-    year: "numeric",
-    month: "long",
-  }).format(date);
+  const anchorDate = new Date(Date.UTC(year, month - 1, 15, 12, 0, 0));
+  return monthTitleFormatter.format(anchorDate);
 }
 
 export function formatExpenseTimestamp(date: Date) {
