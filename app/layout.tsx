@@ -32,7 +32,15 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} bg-stone-100 text-slate-900 font-sans antialiased`}
       >
         <div className="relative min-h-screen">
-          <main className="mx-auto w-full max-w-6xl px-6 pb-16">{children}</main>
+          <header className="flex justify-end px-6 pt-8 sm:pt-10">
+            <Link
+              href="/about"
+              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-medium text-slate-700 shadow-sm transition duration-150 ease-out hover:border-slate-300 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 active:scale-95"
+            >
+              About
+            </Link>
+          </header>
+          <main className="mx-auto mt-6 w-full max-w-6xl px-6 pb-16">{children}</main>
           <Analytics />
         </div>
       </body>
