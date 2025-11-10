@@ -7,7 +7,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: oklch(0.95 0.01 95);
+  background-color: rgb(245 245 244);
   color: rgb(15 23 42);
 }
 

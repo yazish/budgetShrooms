@@ -1,12 +1,15 @@
 import { redirect } from "next/navigation";
 
-import { createExpense, deleteExpense, signOut } from "@/app/actions";
+import { Prisma } from "@prisma/client";
+
+import { createExpense, deleteExpense, signOut, updateBudget } from "@/app/actions";
 import { MonthDrawer } from "@/components/month-drawer";
 import { MonthSidebar } from "@/components/month-sidebar";
+import { SignOutButton } from "@/components/sign-out-button";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import {
-  formatCurrencyFromCents,
+  formatCurrency,
   formatExpenseTimestamp,
   formatMonthIdentifier,
   formatMonthTitle,
@@ -55,7 +58,7 @@ export default async function Home({ searchParams }: PageProps) {
   }));
 
   const { start, end } = getMonthRange(activeMonth);
-  const expenses = await prisma.expense.findMany({
+  const expensesRaw = await prisma.expense.findMany({
     where: {
       userId: session.userId,
       occurredAt: {
@@ -66,14 +69,35 @@ export default async function Home({ searchParams }: PageProps) {
     orderBy: { occurredAt: "desc" },
   });
 
-  const totalCents = expenses.reduce((sum, expense) => sum + expense.amountCents, 0);
+  const expenses = expensesRaw as unknown as Array<{
+    id: string;
+    amount: Prisma.Decimal;
+    note: string | null;
+    occurredAt: Date;
+  }>;
+
+  const totalAmount = expenses.reduce(
+    (sum, expense) => sum + Number(expense.amount),
+    0,
+  );
+
+  const currentBudgetSource = (session.user as Record<string, unknown>)
+    .currentBudget;
+  const currentBudget = Number(currentBudgetSource ?? 0);
+  const remainingBudget = currentBudget - totalAmount;
+  const formattedBudget = formatCurrency(currentBudget);
+  const formattedRemaining = formatCurrency(remainingBudget);
+  const remainingIsPositive = remainingBudget >= 0;
+  const budgetInputDefault = Number.isFinite(currentBudget)
+    ? currentBudget.toFixed(2)
+    : "0.00";
 
   return (
     <div className="min-h-screen bg-stone-100">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-4 pb-16 pt-6 sm:px-6 lg:px-8 md:flex-row md:gap-12">
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-4 pb-16 pt-6 sm:px-6 lg:px-8 md:flex-row md:items-start md:gap-12">
         <MonthSidebar months={monthLinks} activeMonth={activeMonth} />
         <div className="flex-1">
-          <header className="mb-8 rounded-3xl border border-slate-200 bg-white/80 px-6 py-6 shadow-sm backdrop-blur md:px-10">
+          <header className="mb-8 mt-0 rounded-3xl border border-slate-200 bg-white/80 px-6 py-6 shadow-sm backdrop-blur md:px-10">
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-4">
                 <MonthDrawer months={monthLinks} activeMonth={activeMonth} />
@@ -97,12 +121,7 @@ export default async function Home({ searchParams }: PageProps) {
                   <p className="text-sm font-medium text-slate-600">{session.user.email}</p>
                 </div>
                 <form action={signOut}>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:text-slate-900"
-                  >
-                    Sign out
-                  </button>
+                  <SignOutButton />
                 </form>
               </div>
             </div>
@@ -110,9 +129,65 @@ export default async function Home({ searchParams }: PageProps) {
 
           <main className="space-y-10 pb-8">
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur sm:p-8">
+              <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Monthly budget</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Track your monthly limit and adjust it whenever your plan changes.
+                  </p>
+                </div>
+                <dl className="grid grid-cols-2 gap-6 text-left">
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Budget</dt>
+                    <dd className="text-lg font-semibold text-slate-900">{formattedBudget}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Remaining</dt>
+                    <dd
+                      className={`text-lg font-semibold ${
+                        remainingIsPositive ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {formattedRemaining}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <form
+                action={updateBudget}
+                className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end"
+              >
+                <div className="flex-1">
+                  <label htmlFor="budget" className="text-sm font-medium text-slate-700">
+                    Set monthly budget
+                  </label>
+                  <input
+                    id="budget"
+                    name="budget"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={budgetInputDefault}
+                    className="mt-1 h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base text-slate-900 shadow-sm transition focus:border-slate-400"
+                    aria-describedby="budget-helper"
+                  />
+                  <p id="budget-helper" className="mt-1 text-xs text-slate-500">
+                    Enter the amount you plan to spend this month.
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 active:scale-95 active:bg-slate-900/90 active:shadow-inner"
+                >
+                  Save budget
+                </button>
+              </form>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur sm:p-8">
               <h2 className="text-lg font-semibold text-slate-900">Add expense</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Amounts are stored as cents. Enter whole dollars and an optional note.
+                Enter the amount (cents supported) and add an optional note for quick context.
               </p>
               <form action={createExpense} className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end">
                 <div className="flex-1">
@@ -122,9 +197,10 @@ export default async function Home({ searchParams }: PageProps) {
                   <input
                     id="amount"
                     name="amount"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
                     required
-                    inputMode="numeric"
-                    pattern="\\d*"
                     placeholder="42"
                     className="mt-1 h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-semibold text-slate-900 shadow-sm transition focus:border-slate-400"
                   />
@@ -143,7 +219,7 @@ export default async function Home({ searchParams }: PageProps) {
                 </div>
                 <button
                   type="submit"
-                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 active:scale-95 active:bg-slate-900/90 active:shadow-inner"
                 >
                   Add
                 </button>
@@ -158,7 +234,7 @@ export default async function Home({ searchParams }: PageProps) {
                       {formatMonthTitle(activeMonth)}
                     </p>
                     <h2 className="text-2xl font-semibold text-slate-900">
-                      {formatCurrencyFromCents(totalCents)}
+                      {formatCurrency(totalAmount)}
                     </h2>
                   </div>
                   <p className="text-sm text-slate-500">
@@ -185,13 +261,13 @@ export default async function Home({ searchParams }: PageProps) {
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="text-base font-semibold text-slate-900">
-                          {formatCurrencyFromCents(expense.amountCents)}
+                          {formatCurrency(Number(expense.amount))}
                         </span>
                         <form action={deleteExpense}>
                           <input type="hidden" name="expenseId" value={expense.id} />
                           <button
                             type="submit"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition hover:border-red-300 hover:text-red-600"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition hover:border-red-300 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-200 active:scale-95"
                             aria-label="Delete expense"
                           >
                             <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">

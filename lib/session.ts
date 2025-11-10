@@ -3,8 +3,8 @@ import { cookies } from "next/headers";
 import type { Session, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-const SESSION_COOKIE_NAME = "budgetshrooms_session";
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 90;
+export const SESSION_COOKIE_NAME = "budgetshrooms_session";
 
 export type ActiveSession = Session & { user: User };
 
@@ -16,7 +16,9 @@ export async function createSession(userId: string) {
     data: { sessionToken, userId, expires },
   });
 
-  cookies().set({
+  const cookieStore = await cookies();
+
+  cookieStore.set({
     name: SESSION_COOKIE_NAME,
     value: sessionToken,
     expires,
@@ -28,15 +30,17 @@ export async function createSession(userId: string) {
 }
 
 export async function deleteSession() {
-  const token = cookies().get(SESSION_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return;
 
   await prisma.session.deleteMany({ where: { sessionToken: token } });
-  cookies().delete(SESSION_COOKIE_NAME);
+  cookieStore.delete(SESSION_COOKIE_NAME);
 }
 
 export async function getSession(): Promise<ActiveSession | null> {
-  const token = cookies().get(SESSION_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
 
   const session = await prisma.session.findUnique({
@@ -46,7 +50,7 @@ export async function getSession(): Promise<ActiveSession | null> {
 
   if (!session || session.expires < new Date()) {
     await prisma.session.deleteMany({ where: { sessionToken: token } });
-    cookies().delete(SESSION_COOKIE_NAME);
+    cookieStore.delete(SESSION_COOKIE_NAME);
     return null;
   }
 

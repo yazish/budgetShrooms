@@ -88,10 +88,16 @@ export function formatExpenseTimestamp(date: Date) {
   }).format(date);
 }
 
-export function formatCurrencyFromCents(amountCents: number) {
+export function formatCurrency(amount: unknown) {
+  const numericAmount =
+    typeof amount === "number"
+      ? amount
+      : typeof amount === "string"
+      ? Number(amount)
+      : Number(amount ?? 0);
   return new Intl.NumberFormat("en-CA", {
     style: "currency",
     currency: "CAD",
     minimumFractionDigits: 2,
-  }).format(amountCents / 100);
+  }).format(numericAmount);
 }

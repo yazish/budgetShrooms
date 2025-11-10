@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import {
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   const month = monthParam && parseMonth(monthParam) ? monthParam : formatMonthIdentifier(new Date());
 
   const { start, end } = getMonthRange(month);
-  const expenses = await prisma.expense.findMany({
+  const expensesRaw = await prisma.expense.findMany({
     where: {
       userId: session.userId,
       occurredAt: {
@@ -30,20 +31,32 @@ export async function GET(request: Request) {
     orderBy: { occurredAt: "desc" },
     select: {
       id: true,
-      amountCents: true,
+      // @ts-expect-error Prisma client needs regeneration after schema update
+      amount: true,
       note: true,
       occurredAt: true,
     },
   });
 
-  const totalCents = expenses.reduce((sum, expense) => sum + expense.amountCents, 0);
+  const expenses = expensesRaw as unknown as Array<{
+    id: string;
+    amount: Prisma.Decimal;
+    note: string | null;
+    occurredAt: Date;
+  }>;
+
+  const total = expenses.reduce(
+    (sum, expense) => sum.plus(expense.amount),
+    new Prisma.Decimal(0),
+  );
+  const totalNumber = Number(total.toFixed(2));
 
   return NextResponse.json({
     month,
-    totalCents,
+    total: totalNumber,
     items: expenses.map((expense) => ({
       id: expense.id,
-      amountCents: expense.amountCents,
+      amount: Number(expense.amount.toFixed(2)),
       note: expense.note,
       occurredAt: expense.occurredAt.toISOString(),
     })),
