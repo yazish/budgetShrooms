@@ -31,7 +31,6 @@ export async function GET(request: Request) {
     orderBy: { occurredAt: "desc" },
     select: {
       id: true,
-      // @ts-expect-error Prisma client needs regeneration after schema update
       amount: true,
       note: true,
       occurredAt: true,
